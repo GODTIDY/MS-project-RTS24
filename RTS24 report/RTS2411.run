@@ -1,0 +1,104 @@
+reset;
+suffix iis OUT;
+option solver gurobi;
+option presolve 0;
+option gurobi_options 'iis=1 outlev=1 NumericFocus=3 BarHomogeneous=1 ';
+#option gurobi_options 'NumericFocus=3 BarHomogeneous=1'; 
+#option gurobi_options "global=1 iisfind=1 outlev=1 lpmethod=2 outlev=1 crossover=1 BarHomogeneous = 0";
+
+#option knitro_options "outlev=1 feastol_abs=10e-10 feastol=10e-10 ms_enable =1 ms_numthreads=1 numthreads=1 maxit 1000  mip_multistart=1 ";
+
+model "RTS2412.mod";
+
+# Node and demand
+table BusesTable IN "24bus_data.tab":
+    I <- [BusID];
+
+# Load (Pd)
+table LoadTable IN "load_pg_clean.tab":
+    [BusID, Time, Scenario], Pd;
+       
+# Wind and curtailment input
+table WindTable IN "wind_pg_clean.tab":
+    [BusID, Time, Scenario], WindPg;
+
+table CurtailTable IN "curtail_pg_clean.tab":
+    [BusID, Time, Scenario], CurtailPg;
+
+# Generator definitions
+table GensTable IN "24gen_data.tab":
+    P <- [GenID], Bus, Pmax, Pmin;
+
+table GenCostTable IN "24gencost.tab":
+    [GenID], Pc2, Pc1, Pc0;
+
+# Branch definitions
+table BranchesTable IN "24branch_data.tab":
+    L <- [BranchID], FromBus, ToBus, X, RateA;
+
+read table BusesTable;
+read table LoadTable;
+read table WindTable;    
+read table CurtailTable;
+read table GensTable;
+read table GenCostTable;
+read table BranchesTable;
+
+
+data;
+param scen_weight :=
+"Winter" 0.25
+"Spring" 0.25
+"Summer" 0.25
+"Autumn" 0.25;
+
+let SiteCapSwitch      := 0;
+let ChargeGridPenalty  := 100;
+
+for {h in {2,3,4,5,6,7}} {
+    let hFactor := h;
+    solve;
+
+    # 1) Record system cost
+    let ResCost[h] := Total_Cost;
+    printf "h = %g  →  Cost = %g\n", h, Total_Cost;
+
+    # 2) Export the annual power generation of each unit (MWh)
+    printf {p in P} "%d,%g\n",
+        p, sum {t in T, s in S} Pg[p,t,s]  >
+        ("Pg_h" & h & ".csv");
+}
+display ResCost > "hfactor_cost.csv";
+display Capacity;
+
+
+
+########################error test######################################
+
+#display {i in 1.._ncons: _con[i].iis != "non"} _conname[i];
+#expand {i in 1.._ncons: _con[i].iis != "non"} _con[i];
+
+#display {c in 1.._ncons: _con[c].iis != 'non'} _conname[c];
+#expand {c in 1.._ncons: _con[c].iis != 'non'} _con[c];
+
+
+#printf "\n--- IIS constraint names (first 120) ---\n";
+#for {c in 1.._ncons : _con[c].iis != "non" && c <= 120} {
+#    printf "%s\n", _conname[c];
+#}
+
+#printf "\n--- IIS variables (name  lb  ub) ---\n";
+#for {v in 1.._nvars : _var[v].iis != "non"} {
+#    printf "%s  %g  %g\n", _varname[v], _var[v].lb, _var[v].ub;
+#}
+
+#param Shut;
+#let Shut := card {p in P, t in T, s in S : Pg[p,t,s] < Pmin[p]-1e-4};
+
+#display Shut;
+#display {p in P, t in T, s in S : Pg[p,t,s] + eps < Pmin[p]}
+#        (p, t, s, Pg[p,t,s], Pmin[p]);
+#end
+
+
+

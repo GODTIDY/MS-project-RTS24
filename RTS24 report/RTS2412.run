@@ -1,0 +1,133 @@
+reset;
+suffix iis OUT;
+option solver gurobi;
+option presolve 0;
+option gurobi_options 'iis=1 outlev=1 NumericFocus=3 BarHomogeneous=1 ';
+#option gurobi_options 'NumericFocus=3 BarHomogeneous=1'; 
+#option gurobi_options "global=1 iisfind=1 outlev=1 lpmethod=2 outlev=1 crossover=1 BarHomogeneous = 0";
+
+#option knitro_options "outlev=1 feastol_abs=10e-10 feastol=10e-10 ms_enable =1 ms_numthreads=1 numthreads=1 maxit 1000  mip_multistart=1 ";
+
+model "RTS2412.mod";
+
+# Node and demand
+table BusesTable IN "24bus_data.tab":
+    I <- [BusID];
+
+# Load (Pd)
+table LoadTable IN "load_pg_clean.tab":
+    [BusID, Time, Scenario], Pd;
+       
+# Wind and curtailment input
+table WindTable IN "wind_pg_clean.tab":
+    [BusID, Time, Scenario], WindPg;
+
+table CurtailTable IN "curtail_pg_clean.tab":
+    [BusID, Time, Scenario], CurtailPg;
+
+# Generator definitions
+table GensTable IN "24gen_data.tab":
+    P <- [GenID], Bus, Pmax, Pmin;
+
+table GenCostTable IN "24gencost.tab":
+    [GenID], Pc2, Pc1, Pc0;
+
+# Branch definitions
+table BranchesTable IN "24branch_data.tab":
+    L <- [BranchID], FromBus, ToBus, X, RateA;
+
+read table BusesTable;
+read table LoadTable;
+read table WindTable;    
+read table CurtailTable;
+read table GensTable;
+read table GenCostTable;
+read table BranchesTable;
+
+
+data;
+param scen_weight :=
+"Winter" 0.25
+"Spring" 0.25
+"Summer" 0.25
+"Autumn" 0.25;
+
+let SiteCapSwitch      := 0;
+let ChargeGridPenalty  := 100;
+
+
+# ----------- Core three-dimensional & Outer single-factor -----------------------
+for {h in {3,4,6},        # hFactor
+     e in 1..2,           # 1→0.90, 2→0.95
+     b in 1..2} {         # 1→0.5,  2→0.6
+
+    # === Core parameters setting ===
+    let hFactor     := h;
+    let BatteryEta  := if e = 1 then 0.90 else 0.95;
+    let SOCband     := if b = 1 then 0.5  else 0.6;
+
+    # ---------- ④ Penalty sweep ----------
+    for {p in {0,10}} {
+        let ChargeGridPenalty := p;
+        let RateAScale := 1;
+        let LoadScale  := 1;
+        solve;
+        let ResPenCore[h,e,b,p] := Total_Cost;
+    }
+
+    # ---------- ⑤ RateA sweep -----------
+    let ChargeGridPenalty := 0;
+    for {r in {1,0.8}} {
+        let RateAScale := r;
+        solve;
+        let ResRateCore[h,e,b,r] := Total_Cost;
+    }
+
+    # ---------- ⑥ LoadScale sweep ------
+    let RateAScale := 1;
+    for {ls in {1,1.15}} {
+        let LoadScale := ls;
+        solve;
+        let ResLoadCore[h,e,b,ls] := Total_Cost;
+    }
+}
+
+# ---------------- print & output ----------------
+printf "\n======== CORE-SWEEP SUMMARY ========\n";
+
+printf "\n--- Penalty (h,e,b,p) ---\n";  display ResPenCore;
+printf "\n--- RateA   (h,e,b,r) ---\n";  display ResRateCore;
+printf "\n--- Load    (h,e,b,l) ---\n";  display ResLoadCore;
+
+display ResPenCore  > "core_penalty.csv";
+display ResRateCore > "core_rate.csv";
+display ResLoadCore > "core_load.csv";
+
+#######################error test#####################################
+
+#display {i in 1.._ncons: _con[i].iis != "non"} _conname[i];
+#expand {i in 1.._ncons: _con[i].iis != "non"} _con[i];
+
+#display {c in 1.._ncons: _con[c].iis != 'non'} _conname[c];
+#expand {c in 1.._ncons: _con[c].iis != 'non'} _con[c];
+
+#printf "\n--- IIS constraint names (first 120) ---\n";
+#for {c in 1.._ncons : _con[c].iis != "non" && c <= 120} {
+#    printf "%s\n", _conname[c];
+#}
+
+#printf "\n--- IIS variables (name  lb  ub) ---\n";
+#for {v in 1.._nvars : _var[v].iis != "non"} {
+#    printf "%s  %g  %g\n", _varname[v], _var[v].lb, _var[v].ub;
+#}
+
+#param Shut;
+#let Shut := card {p in P, t in T, s in S : Pg[p,t,s] < Pmin[p]-1e-4};
+
+#display Shut;
+#display {p in P, t in T, s in S : Pg[p,t,s] + eps < Pmin[p]}
+#        (p, t, s, Pg[p,t,s], Pmin[p]);
+#end
+
+
+

@@ -1,0 +1,30 @@
+reset;
+option solver gurobi;  # 选择求解器
+
+model "dc_power_flow.mod";  # 载入模型
+
+# **新增变量定义**
+
+
+# 1. 读取数据
+table BusesTable IN "bus_data.tab": 
+    I <- [BusID], Pd;
+
+table GeneratorsTable IN "gen_data.tab": 
+    P <- [GenID], Bus, Pmax, Pmin, Pc1, Pc2, Pc0, Pgm, FuelType;
+
+table BranchesTable IN "branch_data.tab": 
+    L <- [BranchID], FromBus, ToBus, X, RateA;
+
+# 2. 读取数据
+read table BusesTable;
+read table GeneratorsTable;
+read table BranchesTable;
+
+# 3. 执行求解
+solve;
+
+# 4. 显示结果
+display Pg, theta, TotalCost, FuelType, Bus;
+
+
