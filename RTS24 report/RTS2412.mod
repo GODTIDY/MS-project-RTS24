@@ -5,10 +5,10 @@
 # =====================
 # SET DEFINITIONS
 # =====================
-set I; set P; set L;
-set T ordered := 1..24;
-set S := {"Winter","Spring","Summer","Autumn"};
-set StorageBus := {3,5,7,16,21,23};
+set I; set P; set L;                # I:set of buses, P:set of generators, L:set of branches.
+set T ordered := 1..24;             # set of time.
+set S := {"Winter","Spring","Summer","Autumn"};   # set of Scenario(seasons)pool.
+set StorageBus := {3,5,7,16,21,23};   # sites where deploy batteries
 
 # ========== Sensitivity framework ==========
 set H := {2,3,4,5,6,7};                       # hFactor pool
@@ -18,10 +18,10 @@ set Penalty := {0,5,10};                  # $/MWh
 # =====================
 # PARAMETER DEFINITIONS
 # =====================
-param Bus {P};
-param Pd       {I,T,S} >= 0;
-param WindPg   {I,T,S} >= 0;
-param CurtailPg{I,T,S} >= 0;
+param Bus {P};          
+param Pd       {I,T,S} >= 0;      # load in RTS24
+param WindPg   {I,T,S} >= 0;      # wind(without curtail) input
+param CurtailPg{I,T,S} >= 0;      # Curtailed wind input
 
 param Pmax {P};  param Pmin {P};
 param Pc0  {P};  param Pc1  {P};  param Pc2 {P};
@@ -29,25 +29,25 @@ param Pc0  {P};  param Pc1  {P};  param Pc2 {P};
 param FromBus {L};  param ToBus {L};
 param X {L};        param RateA {L};
 
-param scen_weight {s in S} >= 0;
-param ResCost{h in {2,3,4,5,6,7}};
+param scen_weight {s in S} >= 0;      # Scenario set
+param ResCost{h in {2,3,4,5,6,7}};    #resCost in hfactor pool 
 ### -------- switch ----------
 param AllowShutdown default 0;     # =1 allow Pg down to 0； =0 constraint Pmin (old setting)
 param SiteCapSwitch   default 0;   # 1 = cap active, 0 = inactive
 ####test sensitivity test###
-#param eps := 1e-4;           # Tolerate numerical errors
-param hFactor default 4;                 
+#param eps := 1e-4;           # Tolerate numerical errors(did not use right now)
+param hFactor default 4;      # Battery operating time(h)            
 param ChargeGridPenalty default 100;       # $/MWh, Virtual cost of on-grid charging
 param CurtPeakScale default 1;           # Peak wind curtailment amplification coefficient
 param Result{H, ShutSwitch, Penalty};   # Store system costs
-param BatteryEta    default 0.95;   # η_c = η_d
-param SOCband       default 0.60;   # SOC_max − SOC_min
+param BatteryEta    default 0.95;   # η_c = η_d Battery efficiency
+param SOCband       default 0.60;   # SOC_max − SOC_min, Soc: state of charge
 param RateAScale    default 1;      # Line capacity scaling 0.8–1.0
 param LoadScale     default 1;      # Load ±15 %
 param VoLL          default 9000;   # Overload penalty (/MWh)
 param BaseCost;         
 
-# Result buckets
+# Result buckets  (Sensitivity test param)
 param ResPenalty  {p in {0,5,10,20}};
 param ResRate     {r in {0.8,1}};
 param ResLoad     {ls in {0.85,1,1.15}};
@@ -63,15 +63,15 @@ param ResLoadCore {3..6, 1..2, 1..2, {1,1.15}};
 # =====================
 # BATTERY PARAMETERS
 # =====================
-param eta_c := BatteryEta;
-param eta_d := BatteryEta;
+param eta_c := BatteryEta;  # Battery efficiency setting c
+param eta_d := BatteryEta;  # Battery efficiency setting d
 
-param SOC_min := 0.5 - SOCband/2;
-param SOC_max := 0.5 + SOCband/2;
+param SOC_min := 0.5 - SOCband/2; # state of charge min
+param SOC_max := 0.5 + SOCband/2; # state of charge max
 
 # --------Peak wind power curtailment----------------
 param CurtPeak {i in StorageBus} :=
-      CurtPeakScale * max {t in T, s in S} CurtailPg[i,t,s];
+      CurtPeakScale * max {t in T, s in S} CurtailPg[i,t,s];    #max of all curtail input of each site i
 
 
 #####test# =====================
