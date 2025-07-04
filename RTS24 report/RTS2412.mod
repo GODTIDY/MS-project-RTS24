@@ -5,10 +5,10 @@
 # =====================
 # SET DEFINITIONS
 # =====================
-set I; set P; set L;
-set T ordered := 1..24;
-set S := {"Winter","Spring","Summer","Autumn"};
-set StorageBus := {3,5,7,16,21,23};
+set I; set P; set L;   #I:set of buses. P:set of generators. L:set of transmission lines
+set T ordered := 1..24;   #T:time period
+set S := {"Winter","Spring","Summer","Autumn"}; # S: Seasonal scenarios
+set StorageBus := {3,5,7,16,21,23}; # Renewable generator-buses
 
 # ========== Sensitivity framework ==========
 set H := {2,3,4,5,6,7};                       # hFactor pool
@@ -18,13 +18,13 @@ set Penalty := {0,5,10};                  # $/MWh
 # =====================
 # PARAMETER DEFINITIONS
 # =====================
-param Bus {P};
-param Pd       {I,T,S} >= 0;
-param WindPg   {I,T,S} >= 0;
-param CurtailPg{I,T,S} >= 0;
+param Bus {P};                           #Storage-eligible buses
+param Pd       {I,T,S} >= 0;             #Load(Demand)
+param WindPg   {I,T,S} >= 0;             #Net wind injection
+param CurtailPg{I,T,S} >= 0;             #Curtailment input
 
-param Pmax {P};  param Pmin {P};
-param Pc0  {P};  param Pc1  {P};  param Pc2 {P};
+param Pmax {P};  param Pmin {P};         #Output limits of generator
+param Pc0  {P};  param Pc1  {P};  param Pc2 {P}; #Cost-curve coefficients of P
 
 param FromBus {L};  param ToBus {L};
 param X {L};        param RateA {L};
@@ -35,13 +35,13 @@ param ResCost{h in {2,3,4,5,6,7}};
 param AllowShutdown default 0;     # =1 allow Pg down to 0； =0 constraint Pmin (old setting)
 param SiteCapSwitch   default 0;   # 1 = cap active, 0 = inactive
 ####test sensitivity test###
-#param eps := 1e-4;           # Tolerate numerical errors
-param hFactor default 4;                 
+#param eps := 1e-4;           # Tolerate numerical errors do not use anymore
+param hFactor default 4;                   #do not effect anymore
 param ChargeGridPenalty default 100;       # $/MWh, Virtual cost of on-grid charging
 param CurtPeakScale default 1;           # Peak wind curtailment amplification coefficient
 param Result{H, ShutSwitch, Penalty};   # Store system costs
-param BatteryEta    default 0.95;   # η_c = η_d
-param SOCband       default 0.60;   # SOC_max − SOC_min
+param BatteryEta    default 0.95;   # η_c = η_d Charge / discharge efficiency
+param SOCband       default 0.60;   # SOC_max − SOC_min, Normalised SOC band
 param RateAScale    default 1;      # Line capacity scaling 0.8–1.0
 param LoadScale     default 1;      # Load ±15 %
 param VoLL          default 9000;   # Overload penalty (/MWh)
@@ -63,11 +63,11 @@ param ResLoadCore {3..6, 1..2, 1..2, {1,1.15}};
 # =====================
 # BATTERY PARAMETERS
 # =====================
-param eta_c := BatteryEta;
-param eta_d := BatteryEta;
+param eta_c := BatteryEta;     #Charge  efficiency
+param eta_d := BatteryEta;     #Discharge efficiency
 
-param SOC_min := 0.5 - SOCband/2;
-param SOC_max := 0.5 + SOCband/2;
+param SOC_min := 0.5 - SOCband/2; #Normalised SOC band upper limit
+param SOC_max := 0.5 + SOCband/2; #Normalised SOC band lower limit
 
 # --------Peak wind power curtailment----------------
 param CurtPeak {i in StorageBus} :=
@@ -77,26 +77,26 @@ param CurtPeak {i in StorageBus} :=
 #####test# =====================
 # STAGE-1 VARIABLES
 # =====================
-var Capacity {i in StorageBus} >= 0;                                                                    #3.5
+var Capacity {i in StorageBus} >= 0;                        #Installed battery energy at bus i          #3.5
 
 
 # =====================
 # STAGE-2 VARIABLES
 # =====================
-var Pg        {p in P, t in T, s in S} >= 0;
-var PgBattery {i in StorageBus, t in T, s in S} >= 0;
-var theta     {i in I, t in T, s in S};
-var flow      {l in L, t in T, s in S};
-var uload     {i in I, t in T, s in S} >= 0;
+var Pg        {p in P, t in T, s in S} >= 0;                 #thermal unit output
+var PgBattery {i in StorageBus, t in T, s in S} >= 0;        #Battery injection
+var theta     {i in I, t in T, s in S};                      #Voltage phase angle at bus i
+var flow      {l in L, t in T, s in S};                      #DC power flow on line l
+var uload     {i in I, t in T, s in S} >= 0;                 #Unserved load 
 
 # ----- Battery -----
-var Charge       {i in StorageBus, t in T, s in S} >= 0;
-var Discharge    {i in StorageBus, t in T, s in S} >= 0;
-var SOC          {i in StorageBus, t in T, s in S} >= 0;
+var Charge       {i in StorageBus, t in T, s in S} >= 0;     #charge
+var Discharge    {i in StorageBus, t in T, s in S} >= 0;     #discharge
+var SOC          {i in StorageBus, t in T, s in S} >= 0;     #State of charge
 
 ### ---- charging sources -------------------------------
-var ChargeCurtail {i in StorageBus, t in T, s in S} >= 0;  
-var ChargeGrid    {i in StorageBus, t in T, s in S} >= 0; 
+var ChargeCurtail {i in StorageBus, t in T, s in S} >= 0;    #Charging from curtailed wind
+var ChargeGrid    {i in StorageBus, t in T, s in S} >= 0;    #Charging from the grid
 
 
 # =====================
