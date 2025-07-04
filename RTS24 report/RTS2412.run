@@ -57,7 +57,7 @@ let ChargeGridPenalty  := 100;
 
 
 # ----------- Core three-dimensional & Outer single-factor -----------------------
-for {h in {3,4,6},        # hFactor
+for {h in {4},        # hFactor
      e in 1..2,           # 1→0.90, 2→0.95
      b in 1..2} {         # 1→0.5,  2→0.6
 
