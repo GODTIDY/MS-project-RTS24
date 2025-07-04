@@ -52,24 +52,23 @@ param scen_weight :=
 "Summer" 0.25
 "Autumn" 0.25;
 
-let SiteCapSwitch      := 0;
+let SiteCapSwitch      := 0;   #do not use anymore
 let ChargeGridPenalty  := 100;
+solve;
 
-for {h in {2,3,4,5,6,7}} {
-    let hFactor := h;
-    solve;
+#display Capacity;
 
-    # 1) Record system cost
-    let ResCost[h] := Total_Cost;
-    printf "h = %g  →  Cost = %g\n", h, Total_Cost;
+#display {i in StorageBus, t in T, s in S} ChargeCurtail[i,t,s] > "ChargeCurtail.csv";
 
-    # 2) Export the annual power generation of each unit (MWh)
-    printf {p in P} "%d,%g\n",
-        p, sum {t in T, s in S} Pg[p,t,s]  >
-        ("Pg_h" & h & ".csv");
-}
-display ResCost > "hfactor_cost.csv";
-display Capacity;
+#-----------pg output--------------------------------------#
+#printf {p in P}
+#        "%d,%g\n",
+#        p, sum {t in T, s in S} Pg[p,t,s] * scen_weight[s]
+#       > "Pg_tmp.csv";
+#------------charge and discharge output-----------------------#
+#display {i in StorageBus, t in T, s in S} Charge[i,t,s] > "Charge.csv";
+#display {i in StorageBus, t in T, s in S} Discharge[i,t,s] > "Discharge.csv";
+
 
 
 
