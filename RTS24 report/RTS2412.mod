@@ -77,7 +77,7 @@ param CurtPeak {i in StorageBus} :=
 #####test# =====================
 # STAGE-1 VARIABLES
 # =====================
-var Capacity {i in StorageBus} >= 0;                        #Installed battery energy at bus i          #3.5
+var Capacity {i in StorageBus} >= 0;                        #Installed battery energy at bus i          #2.5
 
 
 # =====================
@@ -102,7 +102,7 @@ var ChargeGrid    {i in StorageBus, t in T, s in S} >= 0;    #Charging from the 
 # =====================
 # OBJECTIVE
 # =====================
-minimize Total_Cost:                                                                                    #3.1
+minimize Total_Cost:                                                                                    #2.1
     sum {s in S} scen_weight[s] * (
         sum {t in T, p in P} (Pc2[p]*Pg[p,t,s]^2 + Pc1[p]*Pg[p,t,s] + Pc0[p])
       + sum {i in I, t in T} VoLL*uload[i,t,s]
@@ -114,7 +114,7 @@ minimize Total_Cost:                                                            
 # =====================
 
 # ----- Power balance -----
-subject to PowerBalance {i in I, t in T, s in S}:                                                       #3.6
+subject to PowerBalance {i in I, t in T, s in S}:                                                       #2.6
       sum {p in P: Bus[p]==i} Pg[p,t,s]
     + (if i in StorageBus then PgBattery[i,t,s] else 0)
     + WindPg[i,t,s]
@@ -124,60 +124,56 @@ subject to PowerBalance {i in I, t in T, s in S}:                               
     = LoadScale * Pd[i,t,s] - uload[i,t,s];
 
 # ----- DC flow -----
-subject to FlowDef {l in L, t in T, s in S}:                                                            #3.7
+subject to FlowDef {l in L, t in T, s in S}:                                                            #2.7
     flow[l,t,s] = (1/X[l]) * (theta[FromBus[l],t,s] - theta[ToBus[l],t,s]);
 
-subject to LineLimit_lower {l in L, t in T, s in S}: flow[l,t,s] >= -RateAScale * RateA[l];             #3.16
-subject to LineLimit_upper {l in L, t in T, s in S}: flow[l,t,s] <=  RateAScale * RateA[l];             #3.16
+subject to LineLimit_lower {l in L, t in T, s in S}: flow[l,t,s] >= -RateAScale * RateA[l];             #2.16
+subject to LineLimit_upper {l in L, t in T, s in S}: flow[l,t,s] <=  RateAScale * RateA[l];             #2.16
 
 # ----- Lower limit of the unit (with shutdown switch) -----
-subject to GenMin {p in P, t in T, s in S}:                                                             #3.15
+subject to GenMin {p in P, t in T, s in S}:                                                             #2.15
     Pg[p,t,s] >= (1-AllowShutdown) * Pmin[p];              
 
-subject to GenMax {p in P, t in T, s in S}:                                                             #3.15
+subject to GenMax {p in P, t in T, s in S}:                                                             #2.15
     Pg[p,t,s] <= Pmax[p];
 
 # ----- Reference busbar -----
 subject to ReferenceBus {t in T, s in S}: theta[23,t,s] = 0;
 
 # ----- Battery energy balance -----
-subject to BatterySOC {i in StorageBus, t in T, s in S: t>1}:                                           #3.12
+subject to BatterySOC {i in StorageBus, t in T, s in S: t>1}:                                           #2.12
     SOC[i,t,s] = SOC[i,t-1,s] + eta_c*Charge[i,t,s] - (1/eta_d)*Discharge[i,t,s];
 
-subject to BatteryInitEnd  {i in StorageBus, s in S}: SOC[i,1,s]       = 0.5*Capacity[i];               #3.14
-subject to BatteryFinalSOC {i in StorageBus, s in S}: SOC[i,card(T),s] = 0.5*Capacity[i];               #3.14
+subject to BatteryInitEnd  {i in StorageBus, s in S}: SOC[i,1,s]       = 0.5*Capacity[i];               #2.14
+subject to BatteryFinalSOC {i in StorageBus, s in S}: SOC[i,card(T),s] = 0.5*Capacity[i];               #2.14
 
 # ----- limit of charging and discharging power ≤ the Curtpeak & SOC range -----
-subject to ChargePeak {i in StorageBus, t in T, s in S}:                                                #3.11
+subject to ChargePeak {i in StorageBus, t in T, s in S}:                                                #2.11
     Charge[i,t,s]    <= Capacity[i]*0.25;
 
-subject to DischargePeak {i in StorageBus, t in T, s in S}:                                             #3.11
+subject to DischargePeak {i in StorageBus, t in T, s in S}:                                             #2.11
     Discharge[i,t,s] <= Capacity[i]*0.25;
     
-subject to DischargePeak1 {i in StorageBus, t in T, s in S}:                                            #3.17
+subject to DischargePeak1 {i in StorageBus, t in T, s in S}:                                            #2.17
     Discharge[i,t,s]+WindPg[i,t,s] <= max {tt in T, ss in S} WindPg[i,tt,ss];# / hFactor;    
         
-subject to SOCLower {i in StorageBus, t in T, s in S}:                                                  #3.13
+subject to SOCLower {i in StorageBus, t in T, s in S}:                                                  #2.13
     SOC[i,t,s] >= SOC_min * Capacity[i];
 
-subject to SOCUpper {i in StorageBus, t in T, s in S}:                                                  #3.13
+subject to SOCUpper {i in StorageBus, t in T, s in S}:                                                  #2.13
     SOC[i,t,s] <= SOC_max * Capacity[i];
 
 # ----- Charging source & Upper limit of power rationing -----
-subject to ChargeDecompose {i in StorageBus, t in T, s in S}:                                           #3.9
+subject to ChargeDecompose {i in StorageBus, t in T, s in S}:                                           #2.9
     Charge[i,t,s] = ChargeCurtail[i,t,s] + ChargeGrid[i,t,s];           
 
-subject to CurtailmentCap {i in StorageBus, t in T, s in S}:                                            #3.10
+subject to CurtailmentCap {i in StorageBus, t in T, s in S}:                                            #2.10
     ChargeCurtail[i,t,s] <= CurtailPg[i,t,s];                           
 
 # ----- Battery discharge injection limit -----
-subject to PgBatteryMatch {i in StorageBus, t in T, s in S}:                                            #3.18
+subject to PgBatteryMatch {i in StorageBus, t in T, s in S}:                                            #2.18
     PgBattery[i,t,s] <= Discharge[i,t,s];
 
-# ---------- SiteEnergyCap ≤ hfactor×CurtPeak ----------
-#subject to SiteEnergyCap {i in StorageBus : SiteCapSwitch = 1}:
-        #Capacity[i] <= hFactor * CurtPeak[i];
-
 # ---------- TotalEnergy ≤ Σ 4×CurtPeak ----------
-subject to TotalEnergyCap:                                                                               #3.8
+subject to TotalEnergyCap:                                                                               #2.8
     sum {i in StorageBus} Capacity[i] <= 4 * sum {i in StorageBus} CurtPeak[i];
